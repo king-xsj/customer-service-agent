@@ -6,8 +6,8 @@ import { z } from "zod";
  * 查询订单状态
  */
 export const queryOrderStatus = tool(
-  async ({ orderId, userId }) => {
-    console.log(`[Order Query] 查询订单: ${orderId}, 用户: ${userId}`);
+  async ({ orderId }) => {
+    console.log(`[Order Query] 查询订单: ${orderId}, 用户: `);
     
     try {
       // 调用订单系统 API
