@@ -19,6 +19,8 @@ const retriever = vectorStore.asRetriever({
   k: 5,  // 返回最相关的 5 个文档
 });
 
+const RETRIEVAL_TIMEOUT_MS = 10_000;
+
 /**
  * 知识库搜索工具
  */
@@ -26,8 +28,19 @@ export const searchKnowledgeBase = tool(
   async ({ query }) => {
     console.log(`[Knowledge Search] 搜索: "${query}"`);
     
-    // 执行检索
-    const docs = await retriever.invoke(query);
+    // 执行检索，并设置超时，避免外部服务不可用时卡死
+    const docs = await Promise.race([
+      retriever.invoke(query),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("知识库检索超时")),
+          RETRIEVAL_TIMEOUT_MS,
+        ),
+      ),
+    ]).catch((error) => {
+      console.error("[Knowledge Search] 检索失败:", error);
+      return [];
+    });
     
     if (docs.length === 0) {
       return "未在知识库中找到相关信息。";

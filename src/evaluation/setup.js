@@ -3,12 +3,17 @@ import { Client } from "langsmith";
 import { evaluate } from "langsmith/evaluation";
 import { customerServiceAgent } from "../agent.js";
 import { pathToFileURL } from "node:url";
+import { randomUUID } from "node:crypto";
 
 const client = new Client();
 
 // 定义评估数据集
 async function createEvaluationDataset() {
-  const dataset = await client.createDataset("customer-service-eval");
+  const datasetName = "customer-service-eval";
+
+  const dataset = await client.hasDataset({ datasetName })
+    ? await client.readDataset({ datasetName })
+    : await client.createDataset(datasetName);
   
   const testCases = [
     {
@@ -26,11 +31,21 @@ async function createEvaluationDataset() {
     // ...更多测试用例
   ];
   
-  for (const testCase of testCases) {
-    await client.createExample({
-      inputs: testCase.inputs,
-      outputs: { keywords: testCase.expected_keywords },
-    });
+  let exampleCount = 0;
+  for await (const _example of client.listExamples({ datasetId: dataset.id })) {
+    exampleCount += 1;
+  }
+
+  if (exampleCount === 0) {
+    for (const testCase of testCases) {
+      await client.createExample({
+        dataset_id: dataset.id,
+        inputs: testCase.inputs,
+        outputs: { keywords: testCase.expected_keywords },
+      });
+    }
+  } else {
+    console.log(`✅ 数据集 ${datasetName} 已存在 ${exampleCount} 个示例，直接复用`);
   }
   
   console.log(`✅ 创建了 ${testCases.length} 个评估用例`);
@@ -43,6 +58,10 @@ async function runEvaluation() {
     async (inputs) => {
       const result = await customerServiceAgent.invoke({
         messages: [{ role: "user", content: inputs.question }],
+      }, {
+        configurable: {
+          thread_id: `eval-${randomUUID()}`,
+        },
       });
       return { answer: _optionalChain([result, 'access', _ => _.messages, 'access', _2 => _2.at, 'call', _3 => _3(-1), 'optionalAccess', _4 => _4.content]) };
     },
@@ -96,5 +115,11 @@ async function runEvaluation() {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   createEvaluationDataset()
     .then(() => runEvaluation())
-    .catch(console.error);
+    .then(() => {
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error(error);
+      process.exit(1);
+    });
 }
