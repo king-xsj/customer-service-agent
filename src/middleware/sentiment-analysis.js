@@ -32,6 +32,8 @@ export const sentimentAnalysisMiddleware = createMiddleware({
     }
 
     const sentiment = detectSentiment(userMessage.content);
+    console.log(`[情感分析] ${sentiment}: ${userMessage.content}`);
+
     if (sentiment !== "negative") {
       return;
     }
