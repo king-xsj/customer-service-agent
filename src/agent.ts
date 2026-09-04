@@ -8,6 +8,7 @@ import { queryOrderStatus } from "./tools/order-query.js";
 import { trackShipment } from "./tools/tracking.js";
 import { createSupportTicket } from "./tools/ticket-create.js";
 import { transferToHuman } from "./tools/transfer-human.js";
+import { sentimentAnalysisMiddleware } from "./middleware/sentiment-analysis.js";
 
 // 创建持久化 checkpointer
 const checkpointer = PostgresSaver.fromConnString(process.env.DATABASE_URL!);
@@ -36,6 +37,7 @@ export const customerServiceAgent = createAgent({
     transferToHuman,
   ],
   checkpointer,
+  middleware: [sentimentAnalysisMiddleware],
 
   systemPrompt: `你是专业的电商客服助手。
 
